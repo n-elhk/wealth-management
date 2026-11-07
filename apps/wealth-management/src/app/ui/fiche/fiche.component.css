@@ -1,0 +1,33 @@
+/* La fiche est dans une `.carte` (conteneur de requêtes) : elle s'adapte à la largeur de la carte. */
+.fiche {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 0;
+}
+
+.fiche .l1, .fiche .l2 { grid-column: span 2; }
+.fiche .l3 { grid-column: span 3; }
+.fiche .l6 { grid-column: span 6; }
+
+@container (width < 600px) {
+  .fiche { grid-template-columns: 1fr 1fr; }
+  .fiche .l1, .fiche .l2 { grid-column: span 1; }
+  .fiche .l3, .fiche .l6 { grid-column: span 2; }
+}
+
+.fiche dt {
+  font-size: 0.75rem;
+  color: var(--texte-2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.fiche dd {
+  margin: 0.1rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.fiche dd.multiligne {
+  white-space: pre-wrap;
+}

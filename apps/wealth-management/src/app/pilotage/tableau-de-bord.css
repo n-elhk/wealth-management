@@ -1,0 +1,102 @@
+.bienvenue ol {
+  padding-left: 1.2rem;
+  line-height: 2;
+}
+
+/* Jauge native `<progress>` (rôle progressbar, valeur annoncée) entièrement restylée :
+   `appearance: none` désactive le rendu natif, la piste est l'élément lui-même. */
+.jauge {
+  appearance: none;
+  border: 0 solid;
+  overflow: clip;
+  display: block;
+  inline-size: 100%;
+  block-size: 6px;
+  margin-top: 0.4rem;
+  border-radius: 3px;
+  background: var(--gris-doux);
+}
+
+.jauge::-webkit-progress-bar {
+  background: transparent;
+}
+
+/* Une règle par moteur : grouper -webkit- et -moz- invaliderait toute la règle. */
+.jauge::-webkit-progress-value {
+  background: var(--vert);
+}
+
+.jauge::-moz-progress-bar {
+  background: var(--vert);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .jauge::-webkit-progress-value {
+    transition: inline-size 0.3s;
+  }
+}
+
+.histogramme {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.4rem;
+  height: 160px;
+}
+
+.histogramme .barre {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.histogramme .attendu {
+  width: 100%;
+  max-width: 36px;
+  background: var(--gris-doux);
+  border-radius: 4px 4px 0 0;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.histogramme .encaisse {
+  width: 100%;
+  background: var(--primaire);
+}
+
+.histogramme small {
+  font-size: 0.7rem;
+  color: var(--texte-2);
+}
+
+.legende {
+  font-size: 0.8rem;
+  color: var(--texte-2);
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.pastille {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.pastille.encaisse { background: var(--primaire); }
+.pastille.attendu { background: var(--gris-doux); margin-left: 0.6rem; }
+
+.raccourcis {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.carte figure {
+  margin: 0;
+}

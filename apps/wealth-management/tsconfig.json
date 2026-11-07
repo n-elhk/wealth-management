@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compileOnSave": false,
+  "compilerOptions": {
+    "outDir": "./dist/out-tsc",
+    "noPropertyAccessFromIndexSignature": false,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true,
+    "strictTemplates": true
+  }
+}

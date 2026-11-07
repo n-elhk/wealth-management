@@ -1,0 +1,23 @@
+{
+  "name": "wealth-management",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Wealth Management — gestion de patrimoine personnel et de SCI (Tauri 2 + Angular + SQLite)",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @wealth-management/app tauri dev",
+    "build": "pnpm --filter @wealth-management/app tauri build",
+    "android:init": "pnpm --filter @wealth-management/app tauri android init",
+    "android:dev": "pnpm --filter @wealth-management/app tauri android dev",
+    "android:build": "pnpm --filter @wealth-management/app tauri android build",
+    "ios:init": "pnpm --filter @wealth-management/app tauri ios init",
+    "ios:dev": "pnpm --filter @wealth-management/app tauri ios dev",
+    "ios:build": "pnpm --filter @wealth-management/app tauri ios build",
+    "web:build": "pnpm --filter @wealth-management/app build",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}

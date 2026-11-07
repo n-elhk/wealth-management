@@ -1,0 +1,207 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+/* Lien d'évitement : masqué (classe globale .visuellement-masque) tant qu'il n'a pas le focus. */
+.evitement {
+  position: fixed;
+  top: calc(0.5rem + var(--haut));
+  left: 0.5rem;
+  z-index: 40;
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  background: var(--primaire);
+  color: var(--primaire-texte);
+  font-weight: 600;
+}
+
+.navigation {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--nav);
+  background: var(--surface);
+  border-right: 1px solid var(--bord);
+  padding: calc(1rem + var(--haut)) 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  z-index: 30;
+  overflow-y: auto;
+}
+
+.navigation .marque {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.5rem 1rem;
+}
+
+.navigation .marque small {
+  display: block;
+  color: var(--texte-2);
+  font-size: 0.75rem;
+}
+
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--primaire);
+  color: var(--primaire-texte);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+
+.navigation a {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  color: var(--texte);
+}
+
+.navigation a:hover {
+  background: var(--surface-2);
+}
+
+.navigation a.actif {
+  background: var(--primaire-doux);
+  color: var(--primaire);
+  font-weight: 600;
+}
+
+.contenu {
+  margin-left: var(--nav);
+  padding: 1.5rem 2rem 3rem;
+  max-width: calc(1200px + var(--nav));
+}
+
+.barre-mobile {
+  display: none;
+}
+
+.voile {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .barre-mobile {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: calc(0.5rem + var(--haut)) 1rem 0.5rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--bord);
+  }
+
+  /* Tiroir fermé : hors écran ET `visibility: hidden`, donc ses liens sortent de l'ordre
+     de tabulation et de l'arbre d'accessibilité. */
+  .navigation {
+    translate: -100% 0;
+    visibility: hidden;
+    box-shadow: 0 0 40px oklch(0% 0 0 / 20%);
+  }
+
+  .navigation.ouverte {
+    translate: none;
+    visibility: visible;
+  }
+
+  .voile {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: oklch(0% 0 0 / 35%);
+    z-index: 25;
+  }
+
+  .contenu {
+    margin-left: 0;
+    padding: 1rem 1rem calc(2rem + var(--bas));
+  }
+}
+
+@media (max-width: 900px) and (prefers-reduced-motion: no-preference) {
+  /* À la fermeture, `visibility` bascule seulement après la fin du glissement. */
+  .navigation {
+    transition: translate 0.2s ease, visibility 0s linear 0.2s;
+  }
+
+  .navigation.ouverte {
+    transition: translate 0.2s ease, visibility 0s;
+  }
+}
+
+.erreur-bdd {
+  border-color: var(--rouge);
+}
+
+/* Zone de notifications : popover `manual` ouvert en permanence, donc dans la top layer,
+   au-dessus de tout sans `z-index`. On neutralise les styles UA du popover. */
+.notifications:popover-open {
+  inset: auto 1rem calc(1rem + var(--bas)) auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: min(420px, calc(100dvw - 2rem));
+  /* Zone vide : ne bloque pas les clics sur la page en dessous. */
+  pointer-events: none;
+}
+
+.notification {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.5rem 0.6rem 1rem;
+  border-radius: 10px;
+  box-shadow: 0 6px 24px oklch(0% 0 0 / 18%);
+  background: var(--surface);
+  border-left: 4px solid var(--primaire);
+  overflow-wrap: anywhere;
+}
+
+.notification > span {
+  flex: 1;
+  padding-top: 0.2rem;
+}
+
+.notification .fermer {
+  flex: none;
+  border-color: transparent;
+}
+
+.notification.succes { border-left-color: var(--vert); }
+.notification.erreur { border-left-color: var(--rouge); }
+
+/* Classe posée par `animate.leave` : Angular attend la fin de la transition avant de retirer l'élément. */
+.notification.sortie {
+  opacity: 0;
+  translate: 0 0.5rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .notification {
+    transition: opacity 0.2s ease, translate 0.2s ease;
+  }
+
+  /* Entrée : état de départ au moment de l'insertion dans le DOM. */
+  @starting-style {
+    .notification {
+      opacity: 0;
+      translate: 0 0.5rem;
+    }
+  }
+}

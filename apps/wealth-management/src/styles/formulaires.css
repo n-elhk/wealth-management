@@ -1,0 +1,140 @@
+fieldset.carte {
+  border: 1px solid var(--bord);
+}
+
+legend {
+  font-weight: 600;
+  padding: 0 0.4rem;
+  margin-left: -0.4rem;
+}
+
+/* La grille s'adapte à la largeur de son conteneur (`.carte`, `form.imbrique`),
+   pas à celle de la fenêtre : une carte étroite en deux colonnes passe aussi en 2 colonnes. */
+.grille-champs {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.8rem 1rem;
+
+  & .l1 { grid-column: span 1; }
+  & .l2 { grid-column: span 2; }
+  & .l3 { grid-column: span 3; }
+  & .l4 { grid-column: span 4; }
+  & .l6 { grid-column: span 6; }
+
+  @container (width < 600px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    & :is(.l1, .l2) { grid-column: span 1; }
+    & :is(.l3, .l4, .l6) { grid-column: span 2; }
+  }
+}
+
+.champ {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--texte-2);
+
+  &.case {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--texte);
+    align-self: end;
+    min-height: 40px;
+  }
+
+  /* Champ en erreur : `app-erreur` n'affiche son message qu'une fois le champ touché. */
+  &:has(.erreur) :is(input, select, textarea) {
+    border-color: var(--rouge);
+  }
+}
+
+.requis {
+  color: var(--rouge);
+  margin-left: 0.15rem;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  font-size: 16px; /* évite le zoom automatique sur iOS */
+  color: var(--texte);
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  width: 100%;
+  min-height: 40px;
+}
+
+input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  min-height: auto;
+}
+
+/* Champs de saisie : bordure primaire dès le focus (souris comprise) ;
+   les cases à cocher gardent l'anneau `:focus-visible` global. */
+:is(input:not([type='checkbox']), select, textarea):focus {
+  outline: 2px solid var(--primaire-doux);
+  outline-offset: 0;
+  border-color: var(--primaire);
+}
+
+.saisie {
+  position: relative;
+
+  &[data-suffixe] {
+    &::after {
+      content: attr(data-suffixe);
+      position: absolute;
+      right: 0.7rem;
+      top: 50%;
+      translate: 0 -50%;
+      color: var(--texte-2);
+      pointer-events: none;
+      font-size: 0.85rem;
+    }
+
+    & input {
+      padding-right: 4.5rem;
+    }
+  }
+}
+
+.aide {
+  color: var(--texte-2);
+  font-size: 0.75rem;
+}
+
+.erreur {
+  color: var(--rouge);
+  font-size: 0.75rem;
+}
+
+.actions-formulaire {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  position: sticky;
+  bottom: 0;
+  padding: 0.75rem 0 calc(0.75rem + var(--bas));
+  background: linear-gradient(transparent, var(--fond) 30%);
+}
+
+form.imbrique {
+  container-type: inline-size;
+
+  & .grille-champs {
+    margin: 0.5rem 0;
+  }
+
+  & .actions-formulaire {
+    position: static;
+    background: none;
+    padding: 0.25rem 0 0.5rem;
+  }
+}

@@ -1,0 +1,93 @@
+/* `:where()` : spécificité nulle, n'importe quel style peut surcharger. */
+:where(*, ::before, ::after) {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--texte);
+  font: 15px/1.5 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Anneau de focus visible pour la navigation au clavier (boutons, liens, puces…). */
+:focus-visible {
+  outline: 2px solid var(--primaire);
+  outline-offset: 2px;
+}
+
+a {
+  color: var(--primaire);
+  text-decoration: none;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* Titres de carte / de section (h2 sous le h1 de la page, h3 en dessous). */
+h2,
+h3 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+/* Cibles focalisées par script (lien d'évitement) : pas d'anneau sur un bloc non interactif. */
+:is(main, h1)[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* Masqué visuellement, toujours lu par les lecteurs d'écran ; redevient visible s'il reçoit le focus. */
+.visuellement-masque:where(:not(:focus-within, :active)) {
+  position: absolute !important;
+  clip-path: inset(50%) !important;
+  overflow: hidden !important;
+  width: 1px !important;
+  height: 1px !important;
+  margin: -1px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  white-space: nowrap !important;
+}
+
+code {
+  background: var(--gris-doux);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+.muted {
+  color: var(--texte-2);
+
+  &:is(p) {
+    margin: 0.25rem 0;
+  }
+}
+
+.chargement {
+  color: var(--texte-2);
+  text-align: center;
+  margin-top: 4rem;
+}
+
+.icone {
+  display: inline-flex;
+}

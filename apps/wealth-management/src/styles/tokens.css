@@ -1,0 +1,38 @@
+/* Couleurs : `light-dark(clair, sombre)` suit le `color-scheme` calculé. */
+:root {
+  color-scheme: light dark;
+
+  /* Valeurs brutes du primaire, réutilisées pour dériver l'état survolé. */
+  --primaire-clair: oklch(49.09% 0.1807 262.84);
+  --primaire-sombre: oklch(70.28% 0.1547 264.8);
+
+  --fond: light-dark(oklch(97.25% 0.0045 258.32), oklch(18.94% 0.0163 256.83));
+  --surface: light-dark(oklch(100% 0 0), oklch(23.23% 0.0203 254.88));
+  --surface-2: light-dark(oklch(98.42% 0.0034 247.86), oklch(26.18% 0.0237 256.43));
+  --texte: light-dark(oklch(25.98% 0.0306 262.67), oklch(93.57% 0.0092 258.34));
+  --texte-2: light-dark(oklch(50.45% 0.0298 261.06), oklch(71.84% 0.0264 257.66));
+  --bord: light-dark(oklch(92.62% 0.0109 256.7), oklch(32.14% 0.027 255.13));
+  --primaire: light-dark(var(--primaire-clair), var(--primaire-sombre));
+  --primaire-survol: light-dark(
+    oklch(from var(--primaire-clair) calc(l + 0.05) c h),
+    oklch(from var(--primaire-sombre) calc(l + 0.05) c h)
+  );
+  --primaire-texte: light-dark(oklch(100% 0 0), oklch(18.31% 0.0309 263.38));
+  --primaire-doux: light-dark(oklch(94.84% 0.0187 265.98), oklch(28.75% 0.0529 263.85));
+  --vert: light-dark(oklch(52.82% 0.1205 154.9), oklch(78.46% 0.1347 159.52));
+  --vert-doux: light-dark(oklch(95.18% 0.0223 160.22), oklch(31.31% 0.05 163.62));
+  --orange: light-dark(oklch(54.17% 0.1268 60.19), oklch(81.07% 0.1271 73.85));
+  --orange-doux: light-dark(oklch(96.01% 0.0299 78.79), oklch(30.94% 0.0452 76.93));
+  --rouge: light-dark(oklch(54.04% 0.1765 28.56), oklch(73.41% 0.163 26.64));
+  --rouge-doux: light-dark(oklch(94.13% 0.0232 24.13), oklch(29.29% 0.056 26));
+  --gris-doux: light-dark(oklch(95.4% 0.0063 255.48), oklch(29.8% 0.0252 255.72));
+
+  --rayon: 12px;
+  --ombre: 0 1px 2px oklch(20.99% 0.0341 263.44 / 6%), 0 1px 3px oklch(20.99% 0.0341 263.44 / 8%);
+  --nav: 240px;
+  --haut: env(safe-area-inset-top, 0px);
+  --bas: env(safe-area-inset-bottom, 0px);
+
+  /* Cases à cocher, boutons radio, barres de progression natives. */
+  accent-color: var(--primaire);
+}

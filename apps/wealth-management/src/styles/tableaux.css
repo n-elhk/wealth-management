@@ -1,0 +1,58 @@
+/* Conteneur défilant : focusable au clavier (`tabindex="0"`, `role="region"` + `aria-label`
+   dans le template) et hauteur bornée pour que l'en-tête collant reste visible. */
+.tableau {
+  overflow: auto;
+  max-block-size: min(70dvh, 720px);
+
+  &.carte {
+    padding: 0;
+  }
+}
+
+table {
+  width: 100%;
+  /* `separate` : nécessaire pour que les bordures suivent l'en-tête collant. */
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--bord);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--texte-2);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
+tfoot td {
+  font-weight: 600;
+  border-bottom: none;
+}
+
+.num {
+  text-align: right;
+}
+
+tr.cliquable {
+  cursor: pointer;
+
+  &:hover {
+    background: var(--surface-2);
+  }
+}

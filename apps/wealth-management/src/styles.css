@@ -1,0 +1,13 @@
+/* Styles globaux : tokens et composants visuels partagés par plusieurs écrans.
+   Les styles propres à un seul composant vivent à côté de lui (`styleUrl`) ; ils ne sont
+   pas dans une couche, donc ils l'emportent toujours sur ces styles globaux. */
+@layer base, mise-en-page, composants;
+
+@import './styles/tokens.css' layer(base);
+@import './styles/base.css' layer(base);
+@import './styles/mise-en-page.css' layer(mise-en-page);
+@import './styles/boutons.css' layer(composants);
+@import './styles/badges-filtres.css' layer(composants);
+@import './styles/kpi.css' layer(composants);
+@import './styles/tableaux.css' layer(composants);
+@import './styles/formulaires.css' layer(composants);

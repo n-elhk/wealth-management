@@ -1,0 +1,148 @@
+/* ---------- En-têtes ---------- */
+
+.entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+
+  & .actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+}
+
+.retour {
+  font-size: 0.85rem;
+  display: inline-block;
+  margin-bottom: 0.25rem;
+}
+
+.sous-titre {
+  font-size: 1.2rem;
+  margin: 0 0 0.25rem;
+}
+
+/* ---------- Cartes ---------- */
+
+/* Une carte est un conteneur de requêtes : son contenu (grille de champs, fiche)
+   s'adapte à la largeur de la carte via `@container`. */
+.carte {
+  container-type: inline-size;
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  box-shadow: var(--ombre);
+  padding: 1rem 1.25rem;
+  margin: 0 0 1rem;
+
+  &.lien {
+    display: block;
+    color: inherit;
+
+    &:hover {
+      border-color: var(--primaire);
+    }
+
+    & p {
+      margin: 0.15rem 0;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .carte.lien {
+    transition: border-color 0.15s;
+  }
+}
+
+.cartes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+
+  & .carte {
+    margin: 0;
+  }
+}
+
+.ligne-titre {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+
+  & :is(h2, h3) {
+    margin: 0;
+  }
+}
+
+.chiffres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1rem;
+  margin-top: 0.6rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--bord);
+  font-size: 0.85rem;
+  color: var(--texte-2);
+}
+
+.deux-colonnes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vide {
+  text-align: center;
+  padding: 1.5rem 1rem;
+  color: var(--texte-2);
+}
+
+.alerte {
+  background: var(--orange-doux);
+  color: var(--orange);
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+}
+
+.liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  & li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0;
+
+    &:not(:last-child) {
+      border-bottom: 1px solid var(--bord);
+    }
+
+    & > :is(a, div) {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.25rem 0.75rem;
+      color: inherit;
+      flex: 1;
+    }
+
+    & > a .badge {
+      margin-left: auto;
+    }
+  }
+}

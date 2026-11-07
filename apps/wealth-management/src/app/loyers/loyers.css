@@ -1,0 +1,11 @@
+.navigateur-mois {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.navigateur-mois strong {
+  min-width: 130px;
+  text-align: center;
+  text-transform: capitalize;
+}

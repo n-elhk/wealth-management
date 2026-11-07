@@ -1,0 +1,35 @@
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: 0.9rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+
+  & span {
+    color: var(--texte-2);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  & strong {
+    font-size: 1.4rem;
+  }
+
+  & small {
+    color: var(--texte-2);
+  }
+
+  &.alerte-kpi strong {
+    color: var(--rouge);
+  }
+}

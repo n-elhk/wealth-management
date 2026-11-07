@@ -1,0 +1,78 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--bord);
+  background: var(--surface);
+  color: var(--texte);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  &.primaire {
+    background: var(--primaire);
+    border-color: var(--primaire);
+    color: var(--primaire-texte);
+
+    &:hover:not(:disabled) {
+      background: var(--primaire-survol);
+      border-color: var(--primaire-survol);
+    }
+  }
+
+  &.danger {
+    color: var(--rouge);
+  }
+
+  &.petit {
+    min-height: 30px;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.85rem;
+  }
+
+  &.icone-seule {
+    padding: 0.4rem;
+    min-width: 38px;
+  }
+
+  &:is(.lien, .lien-danger) {
+    border: none;
+    background: none;
+    padding: 0;
+    min-height: auto;
+    color: var(--primaire);
+  }
+
+  &.lien-danger {
+    color: var(--rouge);
+    font-size: 0.85rem;
+  }
+}
+
+/* Écran tactile : cibles d'au moins 44 px (WCAG 2.5.8 exige 24 px, 44 px est le confort recommandé). */
+@media (pointer: coarse) {
+  .btn,
+  .btn.petit,
+  .btn:is(.lien, .lien-danger),
+  .puce {
+    min-block-size: 44px;
+  }
+
+  .btn.icone-seule {
+    min-inline-size: 44px;
+  }
+}
