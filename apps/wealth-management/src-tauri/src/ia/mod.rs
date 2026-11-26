@@ -38,14 +38,20 @@ pub struct Ia {
 
 /// Empêche deux opérations longues simultanées (téléchargement, analyse, déchargement) ;
 /// libéré à la destruction.
+///
+/// `prendre` ne remet pas le drapeau d'annulation à zéro : une analyse enchaîne plusieurs
+/// commandes (extraction, comptage, génération) et un « Annuler » cliqué avant la génération
+/// doit l'empêcher de démarrer. Le drapeau est remis à zéro au début de chaque opération
+/// (`ia_nouvelle_analyse`, `ia_telecharger`).
 struct Occupation(Arc<AtomicBool>);
+
+const OCCUPEE: &str = "Une autre opération d'IA est déjà en cours.";
 
 impl Occupation {
     fn prendre(ia: &Ia) -> Result<Self, String> {
         if ia.occupe.swap(true, Ordering::AcqRel) {
-            return Err("Une autre opération d'IA est déjà en cours.".into());
+            return Err(OCCUPEE.into());
         }
-        ia.annulation.store(false, Ordering::Relaxed);
         Ok(Self(ia.occupe.clone()))
     }
 }
@@ -119,6 +125,7 @@ pub async fn ia_telecharger(
     canal: Channel<ProgressionTelechargement>,
 ) -> Result<(), String> {
     let _occupation = Occupation::prendre(&ia)?;
+    ia.annulation.store(false, Ordering::Relaxed);
     let dossier = dossier_modele(&app)?;
     telechargement::telecharger(&dossier, &ia.annulation, |p| {
         let _ = canal.send(p);
@@ -126,7 +133,18 @@ pub async fn ia_telecharger(
     .await
 }
 
-/// Interrompt le téléchargement ou l'analyse en cours.
+/// Début d'une analyse de document (avant l'extraction du texte) : remet le drapeau d'annulation
+/// à zéro. Une annulation demandée ensuite, à n'importe quelle étape, empêche la génération.
+#[tauri::command]
+pub fn ia_nouvelle_analyse(ia: State<'_, Ia>) -> Result<(), String> {
+    if ia.occupe.load(Ordering::Acquire) {
+        return Err(OCCUPEE.into());
+    }
+    ia.annulation.store(false, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Interrompt le téléchargement ou l'analyse en cours (y compris une analyse pas encore en génération).
 #[tauri::command]
 pub fn ia_annuler(ia: State<'_, Ia>) {
     ia.annulation.store(true, Ordering::Relaxed);

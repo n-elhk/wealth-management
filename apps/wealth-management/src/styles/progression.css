@@ -29,3 +29,12 @@
     background: var(--primaire);
   }
 }
+
+/* Message d'étape dans une zone live (`role="status"`) toujours présente : vide, elle ne prend pas de place. */
+.etape {
+  margin: 0.75rem 0 0;
+
+  &:empty {
+    margin: 0;
+  }
+}

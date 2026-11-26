@@ -21,6 +21,7 @@ pub fn run() {
     let builder = builder.manage(ia::Ia::default()).invoke_handler(tauri::generate_handler![
         ia::ia_etat,
         ia::ia_telecharger,
+        ia::ia_nouvelle_analyse,
         ia::ia_annuler,
         ia::ia_decharger,
         ia::ia_extraire_texte,

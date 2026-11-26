@@ -15,19 +15,26 @@ import {
   type Bien,
   type Locataire,
 } from '../schemas.js';
+import {
+  dateLue as date,
+  modeleReponse,
+  montantLu as montant,
+  normaliser,
+  normaliserTexte,
+  objetReponse,
+  opt,
+  selectionnerPassages as selectionnerPassagesCommun,
+  texteLu as texte,
+  validerListe,
+  validerTolerant,
+  type ExtractionDocument,
+} from './commun.js';
+
+export { extraireObjetJson } from './commun.js';
 
 // ---------------------------------------------------------------------------
 // Schéma de la réponse attendue
 // ---------------------------------------------------------------------------
-
-/**
- * Tous les champs sont nullables : le modèle répond `null` pour une information absente du document.
- * Les descriptions (`describe`) sont reprises dans le prompt.
- */
-const opt = <T extends z.ZodType>(s: T, description: string) => s.nullable().describe(description);
-const montant = (description: string) => opt(z.number().min(0), `${description}, en euros`);
-const date = (description: string) => opt(z.iso.date(), `${description} (AAAA-MM-JJ)`);
-const texte = (description: string) => opt(z.string().trim().min(1), description);
 
 export const LocataireExtraitSchema = z.object({
   civilite: opt(CiviliteSchema, 'civilité'),
@@ -84,55 +91,7 @@ export type ExtractionBail = z.output<typeof ExtractionBailSchema>;
 /** Tokens réservés à la réponse (≈ 20 champs + quelques locataires). */
 export const MAX_TOKENS_REPONSE_BAIL = 900;
 
-type JsonSchema = {
-  type?: string | string[];
-  enum?: unknown[];
-  anyOf?: JsonSchema[];
-  format?: string;
-  pattern?: string;
-  description?: string;
-  properties?: Record<string, JsonSchema>;
-  items?: JsonSchema;
-};
-
-/** Variantes d'un champ : zod écrit `anyOf` ou, pour un type simple nullable, `type: ["boolean", "null"]`. */
-function variantes(s: JsonSchema): JsonSchema[] {
-  if (s.anyOf) return s.anyOf;
-  if (Array.isArray(s.type)) return s.type.map((type) => ({ ...s, type }));
-  return [s];
-}
-
-/** Type compact d'un champ, déduit du JSON Schema généré par zod. */
-function typeCompact(s: JsonSchema): string {
-  const types = variantes(s).flatMap((v): string[] => {
-    if (v.enum) return v.enum.map((e) => JSON.stringify(e));
-    if (v.type === 'null') return ['null'];
-    if (v.type === 'string') return [v.format === 'date' ? '"AAAA-MM-JJ"' : 'texte'];
-    if (v.type === 'integer') return ['entier'];
-    if (v.type === 'number') return ['nombre'];
-    if (v.type === 'boolean') return ['true|false'];
-    if (v.type === 'object' || v.type === 'array') return [modeleJson(v)];
-    return ['valeur'];
-  });
-  return types.join(' | ');
-}
-
-/**
- * Modèle JSON commenté (plus compact qu'un JSON Schema complet, ce qui compte avec 4 096 tokens de contexte),
- * généré à partir du schéma zod : le prompt et la validation partagent une seule source.
- */
-function modeleJson(s: JsonSchema, retrait = ''): string {
-  if (s.type === 'array' && s.items) return `[${modeleJson(s.items, retrait)}, …]`;
-  const lignes = Object.entries(s.properties ?? {}).map(([cle, p]) => {
-    const commentaire = p.description && !p.properties && !p.items && !p.anyOf?.some((v) => v.properties) ? ` // ${p.description}` : '';
-    const sousObjet = p.properties ? p : p.anyOf?.find((v) => v.properties);
-    const valeur = sousObjet ? `${modeleJson(sousObjet, `${retrait}  `)} | null` : typeCompact(p);
-    return `${retrait}  "${cle}": ${valeur}${commentaire}`;
-  });
-  return `{\n${lignes.join(',\n')}\n${retrait}}`;
-}
-
-const MODELE_REPONSE = modeleJson(z.toJSONSchema(ExtractionBailSchema, { target: 'draft-2020-12' }) as JsonSchema);
+const MODELE_REPONSE = modeleReponse(ExtractionBailSchema);
 
 /**
  * Prompt au format Mistral Instruct (`[INST] … [/INST]`, le token `<s>` est ajouté par le tokenizer).
@@ -171,101 +130,19 @@ const MOTS_CLES =
  * puis les paragraphes contenant des mots-clés du bail, jusqu'à épuisement du budget.
  */
 export function selectionnerPassages(texte: string, maxCaracteres: number): string {
-  const propre = texte.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
-  if (propre.length <= maxCaracteres) return propre;
-
-  const paragraphes = propre.split(/\n\n/);
-  const retenus = new Set<number>();
-  let restant = maxCaracteres;
-  const retenir = (i: number) => {
-    const longueur = paragraphes[i]!.length + 2;
-    if (retenus.has(i) || longueur > restant) return false;
-    retenus.add(i);
-    restant -= longueur;
-    return true;
-  };
-
-  // 1. Début du document (≈ un tiers du budget).
-  const tete = maxCaracteres / 3;
-  for (let i = 0; i < paragraphes.length && maxCaracteres - restant < tete; i++) if (!retenir(i)) break;
-  // 2. Paragraphes pertinents, dans l'ordre du document.
-  paragraphes.forEach((p, i) => MOTS_CLES.test(p) && retenir(i));
-
-  const morceaux = [...retenus].sort((a, b) => a - b).map((i) => paragraphes[i]!);
-  // Un seul paragraphe géant (PDF sans sauts de ligne) : on tronque.
-  if (morceaux.length === 0) return propre.slice(0, maxCaracteres);
-  return morceaux.join('\n\n');
+  return selectionnerPassagesCommun(texte, maxCaracteres, MOTS_CLES);
 }
+
+/** Import d'un contrat de location (consommé par le service d'IA de l'application). */
+export const EXTRACTION_BAIL: ExtractionDocument = {
+  prompt: promptExtractionBail,
+  maxTokens: MAX_TOKENS_REPONSE_BAIL,
+  selectionner: selectionnerPassages,
+};
 
 // ---------------------------------------------------------------------------
 // Analyse de la réponse
 // ---------------------------------------------------------------------------
-
-/** Isole le premier objet JSON de la réponse (le modèle l'entoure parfois de ```json … ```). */
-export function extraireObjetJson(sortie: string): unknown {
-  const debut = sortie.indexOf('{');
-  if (debut < 0) throw new Error('Le modèle n’a pas renvoyé de données exploitables.');
-  let profondeur = 0;
-  let dansChaine = false;
-  let echappe = false;
-  for (let i = debut; i < sortie.length; i++) {
-    const c = sortie[i];
-    if (dansChaine) {
-      if (echappe) echappe = false;
-      else if (c === '\\') echappe = true;
-      else if (c === '"') dansChaine = false;
-    } else if (c === '"') dansChaine = true;
-    else if (c === '{') profondeur++;
-    else if (c === '}' && --profondeur === 0) {
-      try {
-        return JSON.parse(sortie.slice(debut, i + 1));
-      } catch {
-        break;
-      }
-    }
-  }
-  throw new Error('La réponse du modèle n’est pas un JSON valide.');
-}
-
-/** « 1 250,50 € » → 1250.5 ; laisse les autres valeurs intactes (zod les rejettera si besoin). */
-function nombreSouple(v: unknown): unknown {
-  if (typeof v !== 'string') return v;
-  const t = v.replace(/[\s €]/g, '').replace(/eur(os?)?$/i, '').replace(',', '.');
-  return t !== '' && !Number.isNaN(Number(t)) ? Number(t) : v;
-}
-
-/** « 01/09/2025 » → « 2025-09-01 ». */
-function dateSouple(v: unknown): unknown {
-  if (typeof v !== 'string') return v;
-  const m = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v.trim());
-  return m ? `${m[3]}-${m[2]!.padStart(2, '0')}-${m[1]!.padStart(2, '0')}` : v;
-}
-
-function boolSouple(v: unknown): unknown {
-  if (typeof v !== 'string') return v;
-  if (/^(oui|true|vrai)$/i.test(v.trim())) return true;
-  if (/^(non|false|faux)$/i.test(v.trim())) return false;
-  return v;
-}
-
-/** Corrige les écarts de forme courants du modèle (types, chaînes vides) avant validation. */
-function normaliser(objet: Record<string, unknown>, schema: z.ZodObject): Record<string, unknown> {
-  const sortie: Record<string, unknown> = {};
-  for (const [cle, champ] of Object.entries(schema.shape)) {
-    let v = objet[cle];
-    if (v === undefined || v === '' || (typeof v === 'string' && /^(null|n\/a|non (précisé|renseigné))$/i.test(v.trim()))) {
-      v = null;
-    }
-    const json = z.toJSONSchema(champ as z.ZodType) as JsonSchema;
-    const type = variantes(json).find((t) => t.type !== 'null') ?? json;
-    if (type.type === 'number' || type.type === 'integer') v = nombreSouple(v);
-    else if (type.type === 'boolean') v = boolSouple(v);
-    else if (type.format === 'date') v = dateSouple(v);
-    else if (typeof v === 'number' && type.type === 'string') v = String(v);
-    sortie[cle] = v;
-  }
-  return sortie;
-}
 
 export interface ResultatExtractionBail {
   donnees: ExtractionBail;
@@ -278,11 +155,7 @@ export interface ResultatExtractionBail {
  * il est remplacé par `null` et signalé, l'utilisateur complète dans le formulaire.
  */
 export function analyserReponseBail(sortie: string): ResultatExtractionBail {
-  const brut = extraireObjetJson(sortie);
-  if (typeof brut !== 'object' || brut === null || Array.isArray(brut)) {
-    throw new Error('La réponse du modèle n’est pas un objet JSON.');
-  }
-  const objet = normaliser(brut as Record<string, unknown>, ExtractionBailSchema);
+  const objet = normaliser(objetReponse(sortie), ExtractionBailSchema);
   const champsIgnores: string[] = [];
 
   const bien = objet['bien'];
@@ -292,52 +165,16 @@ export function analyserReponseBail(sortie: string): ResultatExtractionBail {
     if (!b.success) champsIgnores.push('bien');
   } else objet['bien'] = null;
 
-  const locataires = Array.isArray(objet['locataires']) ? objet['locataires'] : [];
-  objet['locataires'] = locataires.flatMap((l, i) => {
-    if (typeof l !== 'object' || l === null) return [];
-    const nettoye = normaliser(l as Record<string, unknown>, LocataireExtraitSchema);
-    const r = LocataireExtraitSchema.safeParse(nettoye);
-    if (r.success) return [r.data];
-    // Garde le locataire en retirant les champs invalides (sauf le nom, indispensable).
-    for (const issue of r.error.issues) {
-      const cle = issue.path[0];
-      if (typeof cle === 'string' && cle !== 'nom') {
-        nettoye[cle] = null;
-        champsIgnores.push(`locataires[${i}].${cle}`);
-      }
-    }
-    const reprise = LocataireExtraitSchema.safeParse(nettoye);
-    return reprise.success ? [reprise.data] : [];
-  });
+  // Garde chaque locataire en retirant ses champs invalides (sauf le nom, indispensable).
+  objet['locataires'] = validerListe(objet['locataires'], LocataireExtraitSchema, 'locataires', 'nom', champsIgnores);
 
-  let resultat = ExtractionBailSchema.safeParse(objet);
-  if (!resultat.success) {
-    for (const issue of resultat.error.issues) {
-      const cle = issue.path[0];
-      if (typeof cle === 'string' && cle !== 'locataires' && cle !== 'bien') {
-        objet[cle] = null;
-        champsIgnores.push(cle);
-      }
-    }
-    resultat = ExtractionBailSchema.safeParse(objet);
-  }
-  if (!resultat.success) throw new Error('Les données renvoyées par le modèle sont inexploitables.');
-  return { donnees: resultat.data, champsIgnores: [...new Set(champsIgnores)] };
+  const donnees = validerTolerant(objet, ExtractionBailSchema, ['locataires', 'bien'], champsIgnores);
+  return { donnees, champsIgnores: [...new Set(champsIgnores)] };
 }
 
 // ---------------------------------------------------------------------------
 // Rapprochement avec les données existantes
 // ---------------------------------------------------------------------------
-
-/** Minuscules sans accents ni ponctuation. */
-function normaliserTexte(s: string | null | undefined): string {
-  return (s ?? '')
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim();
-}
 
 const ABREVIATIONS: Record<string, string> = { bd: 'boulevard', bld: 'boulevard', av: 'avenue', ave: 'avenue', r: 'rue', pl: 'place', che: 'chemin', imp: 'impasse', all: 'allee', rte: 'route', fg: 'faubourg' };
 const motsAdresse = (s: string | null) =>

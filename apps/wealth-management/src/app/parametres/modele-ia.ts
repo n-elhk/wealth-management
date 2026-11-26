@@ -21,14 +21,21 @@ function taille(octets: number) {
         <section class="carte" aria-labelledby="titre-modele-ia">
           <h2 id="titre-modele-ia">IA locale (import de documents)</h2>
           <p class="muted">
-            L’import de baux utilise Mistral 7B Instruct, exécuté sur cet ordinateur : aucun document n’est envoyé sur Internet.
+            L’import de documents (baux, statuts de société) utilise Mistral 7B Instruct, exécuté sur cet ordinateur : aucun document n’est envoyé sur Internet.
             Le modèle ({{ taille(e.tailleTotale) }}) est téléchargé une seule fois depuis Hugging Face,
             puis vérifié ; 16 Go de mémoire vive sont conseillés.
           </p>
 
+          <!-- Zone live toujours présente : seul son contenu change, ce qui garantit l'annonce (VoiceOver / WebKit). -->
+          <p role="status" class="etape">
+            @if (ia.telechargement()) {
+              Téléchargement du modèle…
+            } @else if (e.installe) {
+              <strong>Modèle installé.</strong>{{ e.charge ? ' Il est chargé en mémoire.' : '' }}
+            }
+          </p>
           @if (ia.telechargement(); as p) {
             <div class="progression">
-              <p role="status">Téléchargement du modèle…</p>
               @if (p.total) {
                 <progress [value]="p.recu" [max]="p.total" aria-label="Téléchargement du modèle"></progress>
                 <p class="muted">{{ p.fichier }} : {{ taille(p.recu) }} sur {{ taille(p.total) }}</p>
@@ -38,7 +45,6 @@ function taille(octets: number) {
               <button type="button" class="btn" (click)="annuler()">Interrompre</button>
             </div>
           } @else if (e.installe) {
-            <p role="status"><strong>Modèle installé.</strong>{{ e.charge ? ' Il est chargé en mémoire.' : '' }}</p>
             @if (e.charge) {
               <button type="button" class="btn" (click)="decharger()">Libérer la mémoire du modèle</button>
             }

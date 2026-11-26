@@ -4,31 +4,21 @@ import { Router, RouterLink } from '@angular/router';
 import { open } from '@tauri-apps/plugin-dialog';
 import { LocataireSaisieSchema, nomComplet, type RoleLocataire } from '@wealth-management/core';
 import {
-  MAX_TOKENS_REPONSE_BAIL,
+  EXTRACTION_BAIL,
   analyserReponseBail,
-  promptExtractionBail,
   rapprocherBien,
   rapprocherLocataire,
-  selectionnerPassages,
   type ExtractionBail,
   type LocataireExtrait,
 } from '@wealth-management/core/import';
 import { BaseDeDonnees } from '../../infrastructure/base-de-donnees.service';
 import { Brouillons } from '../../infrastructure/brouillons.service';
-import { IaLocale, type ProgressionGeneration } from '../../infrastructure/ia-locale.service';
+import { IaLocale, type EtapeAnalyse } from '../../infrastructure/ia-locale.service';
 import { Fiche } from '../../ui/fiche/fiche.component';
 import { Icone } from '../../ui/icone';
 import { Notifications } from '../../ui/notifications.service';
 import { cleBrouillonBail, modeleNouveauBail, type BrouillonBail } from './bail.brouillon';
 import { champsBail } from './bail.champs';
-
-interface Progression {
-  /** Étape en cours, annoncée aux lecteurs d'écran (change rarement). */
-  etape: string;
-  valeur?: number;
-  max?: number;
-  detail?: string;
-}
 
 interface ResultatImport {
   fichier: string;
@@ -77,9 +67,10 @@ interface ChoixImport {
             Choisissez un contrat au format PDF contenant du texte (les documents scannés ne sont pas lus).
             L’analyse prend de une à quelques minutes ; vous relirez ensuite le bail avant de l’enregistrer.
           </p>
+          <!-- Zone live toujours présente : seul son contenu change, ce qui garantit l'annonce (VoiceOver / WebKit). -->
+          <p role="status" class="etape">{{ progression()?.etape ?? '' }}</p>
           @if (progression(); as p) {
             <div class="progression">
-              <p role="status">{{ p.etape }}</p>
               @if (p.max) {
                 <progress [value]="p.valeur ?? 0" [max]="p.max" [attr.aria-label]="p.etape"></progress>
               } @else {
@@ -177,7 +168,9 @@ export class ImportBail {
   protected readonly biens = computed(() => (this.listes.hasValue() ? this.listes.value().biens : []));
   protected readonly locatairesExistants = computed(() => (this.listes.hasValue() ? this.listes.value().locataires : []));
 
-  protected readonly progression = signal<Progression | null>(null);
+  protected readonly progression = signal<EtapeAnalyse | null>(null);
+  /** Analyse en cours, interrompue par « Annuler » ou en quittant la page. */
+  private analyse: AbortController | null = null;
   protected readonly resultat = signal<ResultatImport | null>(null);
   protected readonly enCours = signal(false);
 
@@ -212,9 +205,7 @@ export class ImportBail {
 
   constructor() {
     // Quitter la page interrompt l'opération en cours (le modèle reste chargé jusqu'à « Libérer la mémoire »).
-    inject(DestroyRef).onDestroy(() => {
-      if (this.progression()) void this.ia.annuler();
-    });
+    inject(DestroyRef).onDestroy(() => this.analyse?.abort());
   }
 
   protected nom(l: Pick<LocataireExtrait, 'civilite' | 'nom' | 'prenom'>) {
@@ -222,7 +213,7 @@ export class ImportBail {
   }
 
   protected annuler() {
-    void this.ia.annuler();
+    this.analyse?.abort();
   }
 
   protected async decharger() {
@@ -234,45 +225,30 @@ export class ImportBail {
   }
 
   protected async analyser() {
-    const etat = this.etat.value();
-    if (!etat) return;
+    const analyse = new AbortController();
+    this.analyse = analyse;
     const chemin = await open({ multiple: false, directory: false, filters: [{ name: 'Contrat PDF', extensions: ['pdf'] }] });
-    if (!chemin) return;
+    // Page quittée pendant le choix du fichier : rien à faire.
+    if (!chemin || analyse.signal.aborted) return;
     const fichier = chemin.split(/[\\/]/).pop() ?? chemin;
 
     this.resultat.set(null);
-    this.progression.set({ etape: 'Lecture du document…' });
     try {
-      const texte = await this.ia.extraireTexte(chemin);
-      this.progression.set({ etape: 'Préparation de l’analyse…' });
-      const { document, reduit } = await this.ajusterAuContexte(texte, etat.contexte);
-      const sortie = await this.ia.generer(promptExtractionBail(document), MAX_TOKENS_REPONSE_BAIL, (p) =>
-        this.progression.set(progressionGeneration(p)),
+      const { sortie, reduit } = await this.ia.analyserDocument(
+        chemin,
+        EXTRACTION_BAIL,
+        (e) => this.progression.set(e),
+        analyse.signal,
       );
       const { donnees, champsIgnores } = analyserReponseBail(sortie);
       this.resultat.set({ fichier, donnees, champsIgnores, reduit });
     } catch (e) {
-      this.notifications.erreur(e);
+      // Annulation (bouton ou page quittée) : pas d'erreur à afficher, sur cette page ou une autre.
+      if (!analyse.signal.aborted) this.notifications.erreur(e);
     } finally {
       this.progression.set(null);
+      if (this.analyse === analyse) this.analyse = null;
     }
-  }
-
-  /**
-   * Réduit le document pour que prompt + réponse tiennent dans le contexte du modèle (4 096 tokens) :
-   * estimation à ~3 caractères par token, puis ajustement sur le compte exact du tokenizer.
-   */
-  private async ajusterAuContexte(texte: string, contexte: number): Promise<{ document: string; reduit: boolean }> {
-    const disponible = contexte - MAX_TOKENS_REPONSE_BAIL;
-    const base = await this.ia.compterTokens(promptExtractionBail(''));
-    let caracteres = Math.max(500, (disponible - base) * 3);
-    for (let essai = 0; essai < 5; essai++) {
-      const document = selectionnerPassages(texte, caracteres);
-      const tokens = await this.ia.compterTokens(promptExtractionBail(document));
-      if (tokens <= disponible) return { document, reduit: document.length < texte.trim().length * 0.95 };
-      caracteres = Math.floor(caracteres * ((disponible - base) / (tokens - base)) * 0.95);
-    }
-    throw new Error('Impossible de réduire ce document à la taille acceptée par le modèle.');
   }
 
   /** Crée les locataires confirmés puis ouvre le formulaire de bail pré-rempli. */
@@ -307,17 +283,6 @@ export class ImportBail {
     } finally {
       this.enCours.set(false);
     }
-  }
-}
-
-function progressionGeneration(p: ProgressionGeneration): Progression {
-  switch (p.etape) {
-    case 'chargement':
-      return { etape: 'Chargement du modèle en mémoire…', detail: 'Une quinzaine de secondes au premier lancement.' };
-    case 'prompt':
-      return { etape: 'Lecture du contrat par le modèle…', valeur: p.traite, max: p.total, detail: `${p.traite} / ${p.total} tokens` };
-    case 'generation':
-      return { etape: 'Extraction des informations…', valeur: p.tokens, max: p.max, detail: `${p.tokens} tokens générés` };
   }
 }
 
