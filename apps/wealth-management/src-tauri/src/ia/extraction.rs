@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use xberg::{ExtractInput, ExtractionConfig, OcrConfig, OutputFormat};
+use xberg::{ExtractInput, ExtractionConfig, ImageExtractionConfig, OcrConfig, OutputFormat};
 
 /// Formats acceptés : la commande ne lit pas d'autres fichiers.
 fn type_mime(chemin: &Path) -> Option<&'static str> {
@@ -37,11 +37,24 @@ fn config_texte(format: OutputFormat) -> ExtractionConfig {
     ExtractionConfig { output_format: format, disable_ocr: true, ..Default::default() }
 }
 
+/// Résolution maximale des pages dessinées pour l'OCR. Par défaut xberg peut monter à 300 DPI ;
+/// la mémoire du modèle de vision croît avec le nombre de pixels. 150 DPI au plus, et 1 400 px sur
+/// le plus grand côté (≈ 120 DPI pour une page A4) : un texte de 10 pt reste lisible.
+const OCR_DPI_MAX: i32 = 150;
+const OCR_DIMENSION_MAX: i32 = 1400;
+
 /// OCR forcé de toutes les pages avec PaddleOCR-VL, depuis les fichiers téléchargés dans `dossier_ocr`.
 fn config_ocr(dossier_ocr: &Path) -> ExtractionConfig {
     ExtractionConfig {
         output_format: OutputFormat::Markdown,
         force_ocr: true,
+        images: Some(ImageExtractionConfig {
+            target_dpi: OCR_DPI_MAX,
+            max_dpi: OCR_DPI_MAX,
+            max_image_dimension: OCR_DIMENSION_MAX,
+            auto_adjust_dpi: true,
+            ..Default::default()
+        }),
         ocr: Some(OcrConfig {
             backend: "candle-paddleocr-vl".into(),
             language: vec!["fra".into()],
@@ -68,7 +81,12 @@ async fn tenter(octets: Vec<u8>, mime: &'static str, nom: Option<String>, config
 }
 
 /// Texte du document ; `dossier_ocr` est le dossier du modèle d'OCR s'il est installé.
-pub async fn extraire_texte(chemin: &Path, dossier_ocr: Option<&Path>) -> Result<String, String> {
+/// `avant_ocr` est appelé juste avant l'OCR (seulement s'il a lieu) : libération du modèle de langage.
+pub async fn extraire_texte(
+    chemin: &Path,
+    dossier_ocr: Option<&Path>,
+    avant_ocr: impl FnOnce(),
+) -> Result<String, String> {
     let mime = type_mime(chemin).ok_or("Format non pris en charge (PDF, XLSX, XLS ou ODS attendu).")?;
     let taille = tokio::fs::metadata(chemin)
         .await
@@ -97,6 +115,7 @@ pub async fn extraire_texte(chemin: &Path, dossier_ocr: Option<&Path>) -> Result
     // Aucun texte natif : OCR si le modèle est installé (seulement pour les PDF).
     let ocr_possible = mime == "application/pdf";
     if let (true, Some(dossier)) = (ocr_possible, dossier_ocr) {
+        avant_ocr();
         let ocr = tenter(octets, mime, nom, config_ocr(dossier)).await?;
         if !ocr.texte.trim().is_empty() {
             return Ok(ocr.texte);

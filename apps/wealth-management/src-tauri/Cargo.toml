@@ -56,6 +56,11 @@ opt-level = 3
 opt-level = 3
 [profile.dev.package.tokenizers]
 opt-level = 3
+# OCR (xberg + PaddleOCR-VL sur Candle) et rendu des pages PDF : même raison que Candle.
+[profile.dev.package.xberg-candle-ocr]
+opt-level = 3
+[profile.dev.package.xberg-native-pdf]
+opt-level = 3
 [profile.release.package.candle-core]
 opt-level = 3
 [profile.release.package.candle-transformers]
@@ -69,6 +74,8 @@ opt-level = 3
 [profile.release.package.gemm-f16]
 opt-level = 3
 [profile.release.package.tokenizers]
+opt-level = 3
+[profile.release.package.xberg-candle-ocr]
 opt-level = 3
 
 [profile.release]

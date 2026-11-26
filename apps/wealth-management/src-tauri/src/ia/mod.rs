@@ -180,7 +180,7 @@ pub fn ia_decharger(ia: State<'_, Ia>) -> Result<(), String> {
 
 /// Texte d'un document choisi dans la boîte de dialogue.
 #[tauri::command]
-pub async fn ia_extraire_texte(app: AppHandle, chemin: PathBuf) -> Result<String, String> {
+pub async fn ia_extraire_texte(app: AppHandle, ia: State<'_, Ia>, chemin: PathBuf) -> Result<String, String> {
     // Le plugin dialog ajoute au scope fs les fichiers choisis par l'utilisateur : le webview
     // ne peut pas faire lire un autre fichier du disque.
     if !app.fs_scope().is_allowed(&chemin) {
@@ -188,7 +188,15 @@ pub async fn ia_extraire_texte(app: AppHandle, chemin: PathBuf) -> Result<String
     }
     let dossier = dossier_modele(&app)?;
     let ocr = est_installe(&dossier, &OCR).then(|| dossier.join(DOSSIER_OCR));
-    extraction::extraire_texte(&chemin, ocr.as_deref()).await
+    // L'OCR et le modèle de langage ne servent jamais en même temps : libérer Mistral (≈ 5 Go)
+    // avant l'OCR évite de saturer la mémoire. Sans attente : si une analyse l'utilise, on le garde.
+    let modele = Arc::clone(&ia.modele);
+    let liberer_langage = move || {
+        if let Ok(mut m) = modele.try_lock() {
+            drop(m.take());
+        }
+    };
+    extraction::extraire_texte(&chemin, ocr.as_deref(), liberer_langage).await
 }
 
 /// Nombre de tokens du texte (tokenizer seul, sans charger le modèle) : sert à calibrer le prompt.
