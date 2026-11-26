@@ -3,6 +3,7 @@ import { Component, computed, inject, linkedSignal, resource } from '@angular/co
 import { RouterLink } from '@angular/router';
 import { LIBELLES_TYPE_BAIL, type StatutBail } from '@wealth-management/core';
 import { BaseDeDonnees } from '../../infrastructure/base-de-donnees.service';
+import { IaLocale } from '../../infrastructure/ia-locale.service';
 import { LibellePipe } from '../../ui/formats.pipe';
 import { Icone } from '../../ui/icone';
 import { BadgeStatutBail } from './statut-bail';
@@ -15,10 +16,21 @@ import { Vide } from '../../ui/vide';
     <header class="entete">
       <h1>Baux</h1>
       <div class="actions">
-        <a class="btn" routerLink="/baux/importer"><app-icone nom="bail" /> Importer un PDF</a>
+        @if (etatIa(); as e) {
+          @if (e.installe) {
+            <a class="btn" routerLink="/baux/importer"><app-icone nom="bail" /> Importer un PDF</a>
+          } @else {
+            <button type="button" class="btn" disabled aria-describedby="aide-import"><app-icone nom="bail" /> Importer un PDF</button>
+          }
+        }
         <a class="btn primaire" routerLink="/baux/nouveau"><app-icone nom="plus" /> Nouveau bail</a>
       </div>
     </header>
+    @if (etatIa()?.installe === false) {
+      <p id="aide-import" class="muted">
+        Import par IA : téléchargez d’abord le modèle dans les <a routerLink="/parametres">paramètres</a>.
+      </p>
+    }
 
     <div class="filtres">
       @for (f of filtresDispo; track f.valeur) {
@@ -53,6 +65,9 @@ import { Vide } from '../../ui/vide';
 })
 export class BauxListe {
   private readonly bdd = inject(BaseDeDonnees);
+  private readonly ia = inject(IaLocale);
+  /** `null` sur mobile (pas d'IA locale) ou tant que l'état n'est pas connu : pas de bouton d'import. */
+  protected readonly etatIa = computed(() => (this.ia.etat.hasValue() ? this.ia.etat.value() : null));
   private readonly liste = resource({ loader: () => this.bdd.depot.baux.listerResumes() });
   protected readonly baux = computed(() => (this.liste.hasValue() ? this.liste.value() : []));
   /** Filtre par défaut : les baux en cours s'il y en a, sinon tous ; modifiable par l'utilisateur. */

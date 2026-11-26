@@ -4,6 +4,7 @@ import { OPTIONS, ProfilBailleurSaisieSchema, aujourdhui, type ProfilBailleur } 
 import { BaseDeDonnees, FICHIER_BDD } from '../infrastructure/base-de-donnees.service';
 import { Documents } from '../infrastructure/documents.service';
 import { Notifications } from '../ui/notifications.service';
+import { ModeleIa } from './modele-ia';
 import { AccessibiliteChamp, ErreurChamp, sansVides, schemaModele, textes } from '../ui/formulaire/saisie';
 
 const CLES = [
@@ -17,7 +18,7 @@ const SCHEMA = schemaModele((m: ModeleProfil) => sansVides(m), ProfilBailleurSai
 
 @Component({
   selector: 'app-parametres',
-  imports: [FormField, AccessibiliteChamp, ErreurChamp],
+  imports: [FormField, AccessibiliteChamp, ErreurChamp, ModeleIa],
   template: `
     <header class="entete">
       <h1>Paramètres</h1>
@@ -114,6 +115,8 @@ const SCHEMA = schemaModele((m: ModeleProfil) => sansVides(m), ProfilBailleurSai
         </div>
       </form>
     }
+
+    <app-modele-ia />
 
     <section class="carte">
       <h2>Données</h2>

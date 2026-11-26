@@ -1,0 +1,31 @@
+/* Progression d'une opération longue (téléchargement du modèle, analyse d'un document) :
+   message annoncé (`role="status"`), jauge, détail et bouton d'interruption. */
+.progression {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: start;
+  margin-top: 0.75rem;
+
+  & p {
+    margin: 0;
+  }
+
+  /* Jauge native `<progress>` restylée (rôle progressbar conservé) ; sans `value`, elle reste indéterminée. */
+  & progress {
+    appearance: none;
+    border: 0 solid;
+    overflow: clip;
+    inline-size: 100%;
+    block-size: 8px;
+    border-radius: 4px;
+    background: var(--gris-doux);
+  }
+
+  & progress::-webkit-progress-bar {
+    background: transparent;
+  }
+
+  & progress::-webkit-progress-value {
+    background: var(--primaire);
+  }
+}

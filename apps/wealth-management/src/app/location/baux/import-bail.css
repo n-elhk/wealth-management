@@ -4,37 +4,3 @@
   flex-wrap: wrap;
   margin-top: 0.75rem;
 }
-
-.progression {
-  display: grid;
-  gap: 0.4rem;
-  justify-items: start;
-  margin-top: 0.75rem;
-}
-
-.progression p {
-  margin: 0;
-}
-
-/* Jauge native `<progress>` restylée (rôle progressbar conservé) ; sans `value`, elle reste indéterminée. */
-.progression progress {
-  appearance: none;
-  border: 0 solid;
-  overflow: clip;
-  inline-size: 100%;
-  block-size: 8px;
-  border-radius: 4px;
-  background: var(--gris-doux);
-}
-
-.progression progress::-webkit-progress-bar {
-  background: transparent;
-}
-
-.progression progress::-webkit-progress-value {
-  background: var(--primaire);
-}
-
-.progression progress::-moz-progress-bar {
-  background: var(--primaire);
-}

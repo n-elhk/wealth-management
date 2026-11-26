@@ -11,3 +11,4 @@
 @import './styles/kpi.css' layer(composants);
 @import './styles/tableaux.css' layer(composants);
 @import './styles/formulaires.css' layer(composants);
+@import './styles/progression.css' layer(composants);

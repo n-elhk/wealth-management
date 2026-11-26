@@ -45,8 +45,6 @@ interface ChoixImport {
   locataires: { cible: string }[];
 }
 
-const GO = 1024 ** 3;
-
 /**
  * Import d'un contrat de location PDF : texte extrait par xberg, données lues par le modèle local
  * (Mistral 7B via Candle) et validées par zod, puis formulaire de bail pré-rempli pour relecture.
@@ -69,24 +67,9 @@ const GO = 1024 ** 3;
       @if (e === null) {
         <p class="alerte">L’import de documents par IA locale n’est disponible que sur ordinateur.</p>
       } @else if (!e.installe) {
-        <section class="carte">
-          <h2>Modèle d’IA locale</h2>
-          <p>
-            L’analyse utilise Mistral 7B Instruct, exécuté sur cet ordinateur : aucun document n’est envoyé sur Internet.
-            Le modèle ({{ taille(e.tailleTotale) }}) est téléchargé une seule fois depuis Hugging Face,
-            puis vérifié ; 16 Go de mémoire vive sont conseillés.
-          </p>
-          @if (progression(); as p) {
-            <div class="progression">
-              <p role="status">{{ p.etape }}</p>
-              <progress [value]="p.valeur ?? 0" [max]="p.max ?? 1" [attr.aria-label]="p.etape"></progress>
-              <p class="muted">{{ p.detail }}</p>
-              <button type="button" class="btn" (click)="annuler()">Interrompre</button>
-            </div>
-          } @else {
-            <button type="button" class="btn primaire" (click)="telecharger()">Télécharger le modèle</button>
-          }
-        </section>
+        <p class="alerte">
+          Le modèle d’IA locale n’est pas installé : téléchargez-le dans les <a routerLink="/parametres">paramètres</a>.
+        </p>
       } @else {
         <section class="carte">
           <h2>Contrat de location</h2>
@@ -183,7 +166,7 @@ export class ImportBail {
   private readonly router = inject(Router);
   private readonly notifications = inject(Notifications);
 
-  protected readonly etat = resource({ loader: () => this.ia.etat() });
+  protected readonly etat = this.ia.etat;
   protected readonly listes = resource({
     loader: async () => {
       const depot = this.bdd.depot;
@@ -234,32 +217,8 @@ export class ImportBail {
     });
   }
 
-  protected taille(octets: number) {
-    return `${(octets / GO).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
-  }
-
   protected nom(l: Pick<LocataireExtrait, 'civilite' | 'nom' | 'prenom'>) {
     return nomComplet(l, true);
-  }
-
-  protected async telecharger() {
-    this.progression.set({ etape: 'Téléchargement du modèle…' });
-    try {
-      await this.ia.telecharger((p) =>
-        this.progression.set({
-          etape: 'Téléchargement du modèle…',
-          valeur: p.recu,
-          max: p.total,
-          detail: `${p.fichier} : ${this.taille(p.recu)} sur ${this.taille(p.total)}`,
-        }),
-      );
-      this.notifications.succes('Modèle installé');
-    } catch (e) {
-      this.notifications.erreur(e);
-    } finally {
-      this.progression.set(null);
-      this.etat.reload();
-    }
   }
 
   protected annuler() {
@@ -267,8 +226,11 @@ export class ImportBail {
   }
 
   protected async decharger() {
-    await this.ia.decharger();
-    this.etat.reload();
+    try {
+      await this.ia.decharger();
+    } catch (e) {
+      this.notifications.erreur(e);
+    }
   }
 
   protected async analyser() {
@@ -293,7 +255,6 @@ export class ImportBail {
       this.notifications.erreur(e);
     } finally {
       this.progression.set(null);
-      this.etat.reload();
     }
   }
 
