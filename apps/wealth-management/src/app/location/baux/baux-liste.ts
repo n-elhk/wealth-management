@@ -14,7 +14,10 @@ import { Vide } from '../../ui/vide';
   template: `
     <header class="entete">
       <h1>Baux</h1>
-      <a class="btn primaire" routerLink="/baux/nouveau"><app-icone nom="plus" /> Nouveau bail</a>
+      <div class="actions">
+        <a class="btn" routerLink="/baux/importer"><app-icone nom="bail" /> Importer un PDF</a>
+        <a class="btn primaire" routerLink="/baux/nouveau"><app-icone nom="plus" /> Nouveau bail</a>
+      </div>
     </header>
 
     <div class="filtres">

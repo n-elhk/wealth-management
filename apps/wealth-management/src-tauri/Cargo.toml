@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Wealth Management — gestion de patrimoine personnel et de SCI"
 authors = ["Nicolas El-Hayek"]
 edition = "2021"
-rust-version = "1.80"
+# Minimum imposé par xberg 1.5.4 (et html-to-markdown-rs) : `cargo metadata` donne la plus haute
+# `rust-version` des dépendances.
+rust-version = "1.99"
 
 [lib]
 # `staticlib` et `cdylib` sont requis pour les cibles mobiles (iOS / Android).
@@ -21,6 +23,51 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+# IA locale (import de documents) : desktop uniquement — le modèle (~5 Go, 16 Go de RAM conseillés)
+# n'est pas envisageable sur mobile, et ces crates ne sont pas compilées pour Android / iOS.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+candle-core = "0.11.1"
+candle-transformers = "0.11.1"
+tokenizers = { version = "0.23.2", default-features = false, features = ["onig"] }
+xberg = { version = "1.5.4", default-features = false, features = ["pdf", "excel", "tokio-runtime"] }
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "stream"] }
+futures-util = "0.3.34"
+sha2 = "0.11.2"
+hex = "0.4"
+# `time` : attente bornée du flux de téléchargement (annulation réactive même sans données).
+tokio = { version = "1", features = ["fs", "io-util", "time"] }
+
+# Candle est inutilisable sans optimisation (inférence ~100× plus lente) : optimisé même en debug,
+# et en `opt-level = 3` (vitesse) plutôt que "s" en release.
+[profile.dev.package.candle-core]
+opt-level = 3
+[profile.dev.package.candle-transformers]
+opt-level = 3
+[profile.dev.package.gemm]
+opt-level = 3
+[profile.dev.package.gemm-common]
+opt-level = 3
+[profile.dev.package.gemm-f32]
+opt-level = 3
+[profile.dev.package.gemm-f16]
+opt-level = 3
+[profile.dev.package.tokenizers]
+opt-level = 3
+[profile.release.package.candle-core]
+opt-level = 3
+[profile.release.package.candle-transformers]
+opt-level = 3
+[profile.release.package.gemm]
+opt-level = 3
+[profile.release.package.gemm-common]
+opt-level = 3
+[profile.release.package.gemm-f32]
+opt-level = 3
+[profile.release.package.gemm-f16]
+opt-level = 3
+[profile.release.package.tokenizers]
+opt-level = 3
 
 [profile.release]
 codegen-units = 1

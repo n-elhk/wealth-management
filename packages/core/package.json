@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Modèle métier, calculs (échéances, révision IRL) et générateurs de documents",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./import": "./src/import/bail.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -8,6 +8,7 @@ export const LOCATION_ROUTES: Routes = [
   { path: 'locataires/:id/modifier', loadComponent: () => import('./locataires/locataire-form').then((m) => m.LocataireForm), title: 'Modifier le locataire' },
 
   { path: 'baux', loadComponent: () => import('./baux/baux-liste').then((m) => m.BauxListe), title: 'Baux' },
+  { path: 'baux/importer', loadComponent: () => import('./baux/import-bail').then((m) => m.ImportBail), title: 'Importer un bail' },
   { path: 'baux/nouveau', loadComponent: () => import('./baux/bail-form').then((m) => m.BailForm), title: 'Nouveau bail' },
   { path: 'baux/:id', loadComponent: () => import('./baux/bail-detail').then((m) => m.BailDetail), title: 'Bail' },
   { path: 'baux/:id/modifier', loadComponent: () => import('./baux/bail-form').then((m) => m.BailForm), title: 'Modifier le bail' },

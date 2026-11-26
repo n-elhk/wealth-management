@@ -18,6 +18,7 @@ import {
 } from '@wealth-management/core';
 import { BaseDeDonnees } from '../../infrastructure/base-de-donnees.service';
 import { Brouillons } from '../../infrastructure/brouillons.service';
+import { CLES_BAIL, cleBrouillonBail, modeleNouveauBail, type BrouillonBail, type ModeleBail } from './bail.brouillon';
 import { Notifications } from '../../ui/notifications.service';
 import { idRoute } from '../../ui/route';
 import { AccessibiliteChamp, ErreurChamp, bool, nombre, sansVides, schemaModele, textes } from '../../ui/formulaire/saisie';
@@ -27,15 +28,6 @@ import { Icone } from '../../ui/icone';
 const CHAMPS_ECHEANCES: (keyof Bail)[] = [
   'date_debut', 'duree_mois', 'tacite_reconduction', 'date_sortie', 'loyer_hc', 'charges', 'jour_paiement', 'paiement_terme', 'statut',
 ];
-
-const CLES = [
-  'bien_id', 'type_bail', 'reference', 'statut', 'date_signature', 'date_debut', 'duree_mois', 'destination',
-  'date_sortie', 'motif_sortie', 'loyer_hc', 'charges', 'mode_charges', 'depot_garantie',
-  'jour_paiement', 'paiement_terme', 'mode_paiement',
-  'irl_trimestre_reference', 'irl_valeur_reference', 'loyer_reference_majore', 'complement_loyer', 'dernier_loyer_precedent',
-  'clauses_particulieres', 'notes',
-] as const;
-type ModeleBail = Record<(typeof CLES)[number], string> & { tacite_reconduction: boolean; zone_tendue: boolean };
 
 const NUMERIQUES = [
   'bien_id', 'duree_mois', 'loyer_hc', 'charges', 'depot_garantie', 'jour_paiement',
@@ -65,12 +57,6 @@ interface ChoixLocataire {
   nom: string;
   coche: boolean;
   role: RoleLocataire;
-}
-
-/** Saisie conservée pendant la création d'un locataire depuis le formulaire. */
-interface BrouillonBail {
-  modele: ModeleBail;
-  roles: [number, RoleLocataire][];
 }
 
 @Component({
@@ -338,7 +324,7 @@ export class BailForm {
   protected readonly options = OPTIONS;
 
   /** Saisie laissée avant de créer un locataire, reprise une seule fois au retour sur ce formulaire. */
-  private readonly brouillon = computed(() => this.brouillons.reprendre<BrouillonBail>(cleBrouillon(this.id())));
+  private readonly brouillon = computed(() => this.brouillons.reprendre<BrouillonBail>(cleBrouillonBail(this.id())));
 
   /** Listes de choix (biens, locataires), nécessaires en création comme en modification. */
   protected readonly listes = resource({
@@ -376,28 +362,10 @@ export class BailForm {
     const brouillon = this.brouillon();
     if (brouillon) return brouillon.modele;
     const bail = this.original();
-    if (bail) return { ...textes(CLES, bail), tacite_reconduction: !!bail.tacite_reconduction, zone_tendue: !!bail.zone_tendue };
+    if (bail) return { ...textes(CLES_BAIL, bail), tacite_reconduction: !!bail.tacite_reconduction, zone_tendue: !!bail.zone_tendue };
     const bienId = this.bien();
     const bien = this.listes.hasValue() ? this.listes.value().biens.find((b) => b.id === bienId) : undefined;
-    const type: TypeBail = bien?.meuble ? 'habitation_meuble' : 'habitation_vide';
-    return {
-      ...textes(CLES, {
-        bien_id: bienId,
-        type_bail: type,
-        statut: 'actif',
-        date_debut: aujourdhui(),
-        date_signature: aujourdhui(),
-        duree_mois: DUREE_DEFAUT_BAIL[type],
-        charges: 0,
-        mode_charges: 'provision',
-        depot_garantie: 0,
-        jour_paiement: 1,
-        paiement_terme: 'echoir',
-        mode_paiement: 'virement',
-      }),
-      tacite_reconduction: true,
-      zone_tendue: false,
-    };
+    return modeleNouveauBail({ bien_id: bienId, type_bail: bien?.meuble ? 'habitation_meuble' : 'habitation_vide' });
   });
 
   protected readonly f = form(this.modele, (p) => {
@@ -491,7 +459,7 @@ export class BailForm {
   /** Conserve la saisie puis ouvre la création d'un locataire, qui reviendra ici en le sélectionnant. */
   protected nouveauLocataire() {
     const id = this.id();
-    this.brouillons.conserver<BrouillonBail>(cleBrouillon(id), {
+    this.brouillons.conserver<BrouillonBail>(cleBrouillonBail(id), {
       modele: this.modele(),
       roles: this.selection().map((c) => [c.locataire_id, c.role]),
     });
@@ -546,8 +514,4 @@ export class BailForm {
     const id = this.id();
     this.router.navigate(id ? ['/baux', id] : ['/baux']);
   }
-}
-
-function cleBrouillon(id: number | null) {
-  return `bail:${id ?? 'nouveau'}`;
 }
