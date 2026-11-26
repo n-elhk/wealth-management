@@ -18,14 +18,14 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, TryLockError};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::ipc::Channel;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_fs::FsExt;
 use tokenizers::Tokenizer;
 
 use llm::{Etape, Llm};
-use telechargement::{est_present, ProgressionTelechargement, FICHIERS};
+use telechargement::{est_installe, ProgressionTelechargement, DOSSIER_OCR, LANGAGE, OCR};
 
 /// État partagé : modèle chargé à la demande (≈ 5 Go en mémoire), tokenizer partagé et drapeaux.
 #[derive(Default)]
@@ -76,8 +76,8 @@ fn dossier_modele(app: &AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("Dossier de données introuvable : {e}"))
 }
 
-fn est_installe(dossier: &Path) -> bool {
-    FICHIERS.iter().all(|f| est_present(dossier, f))
+fn langage_installe(dossier: &Path) -> bool {
+    est_installe(dossier, &LANGAGE)
 }
 
 /// Tokenizer chargé une seule fois, partagé entre le comptage de tokens et le modèle.
@@ -99,6 +99,18 @@ pub struct EtatIa {
     charge: bool,
     taille_totale: u64,
     contexte: usize,
+    /// Modèle d'OCR (facultatif) : lecture des PDF scannés ou dont le texte est dessiné.
+    ocr_installe: bool,
+    /// Taille estimée du modèle d'OCR, pour l'affichage avant téléchargement.
+    taille_ocr: u64,
+}
+
+/// Modèle à télécharger (`ia_telecharger`).
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ModeleATelecharger {
+    Langage,
+    Ocr,
 }
 
 #[tauri::command]
@@ -111,10 +123,12 @@ pub fn ia_etat(app: AppHandle, ia: State<'_, Ia>) -> Result<EtatIa, String> {
         Err(TryLockError::Poisoned(e)) => e.into_inner().is_some(),
     };
     Ok(EtatIa {
-        installe: est_installe(&dossier),
+        installe: langage_installe(&dossier),
         charge,
-        taille_totale: FICHIERS.iter().map(|f| f.taille).sum(),
+        taille_totale: LANGAGE.taille_affichee,
         contexte: llm::CONTEXTE,
+        ocr_installe: est_installe(&dossier, &OCR),
+        taille_ocr: OCR.taille_affichee,
     })
 }
 
@@ -122,12 +136,17 @@ pub fn ia_etat(app: AppHandle, ia: State<'_, Ia>) -> Result<EtatIa, String> {
 pub async fn ia_telecharger(
     app: AppHandle,
     ia: State<'_, Ia>,
+    modele: ModeleATelecharger,
     canal: Channel<ProgressionTelechargement>,
 ) -> Result<(), String> {
     let _occupation = Occupation::prendre(&ia)?;
     ia.annulation.store(false, Ordering::Relaxed);
     let dossier = dossier_modele(&app)?;
-    telechargement::telecharger(&dossier, &ia.annulation, |p| {
+    let modele = match modele {
+        ModeleATelecharger::Langage => &LANGAGE,
+        ModeleATelecharger::Ocr => &OCR,
+    };
+    telechargement::telecharger(&dossier, modele, &ia.annulation, |p| {
         let _ = canal.send(p);
     })
     .await
@@ -167,7 +186,9 @@ pub async fn ia_extraire_texte(app: AppHandle, chemin: PathBuf) -> Result<String
     if !app.fs_scope().is_allowed(&chemin) {
         return Err("Accès refusé : choisissez le document avec la boîte de dialogue.".into());
     }
-    extraction::extraire_texte(&chemin).await
+    let dossier = dossier_modele(&app)?;
+    let ocr = est_installe(&dossier, &OCR).then(|| dossier.join(DOSSIER_OCR));
+    extraction::extraire_texte(&chemin, ocr.as_deref()).await
 }
 
 /// Nombre de tokens du texte (tokenizer seul, sans charger le modèle) : sert à calibrer le prompt.
@@ -202,7 +223,7 @@ pub async fn ia_generer(
 ) -> Result<String, String> {
     let occupation = Occupation::prendre(&ia)?;
     let dossier = dossier_modele(&app)?;
-    if !est_installe(&dossier) {
+    if !langage_installe(&dossier) {
         return Err("Le modèle n'est pas installé.".into());
     }
     let modele = Arc::clone(&ia.modele);

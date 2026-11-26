@@ -1,9 +1,13 @@
 //! Extraction du contenu d'un document avec xberg (backend PDF 100 % Rust, tableurs via calamine).
 //! Le contenu est rendu en Markdown : les tableaux restent lisibles par le modèle.
+//!
+//! PDF sans texte (scanné, ou texte vectorisé) : si le modèle d'OCR a été téléchargé (paramètres),
+//! xberg dessine les pages et en reconnaît le texte avec PaddleOCR-VL (Candle, sur CPU), à partir
+//! du dossier local (`model_path`) : il ne télécharge jamais rien lui-même.
 
 use std::path::Path;
 
-use xberg::{ExtractInput, ExtractionConfig, OutputFormat};
+use xberg::{ExtractInput, ExtractionConfig, OcrConfig, OutputFormat};
 
 /// Formats acceptés : la commande ne lit pas d'autres fichiers.
 fn type_mime(chemin: &Path) -> Option<&'static str> {
@@ -26,23 +30,45 @@ struct Tentative {
     /// Erreurs non bloquantes signalées par xberg (sans elles, un échec ressemble à un document vide).
     erreurs: Vec<String>,
     pages: usize,
-    images: usize,
 }
 
-async fn tenter(octets: Vec<u8>, mime: &'static str, nom: Option<String>, format: OutputFormat) -> Result<Tentative, String> {
-    let config = ExtractionConfig { output_format: format, ..Default::default() };
+/// Lecture du texte natif uniquement (rapide, sans OCR).
+fn config_texte(format: OutputFormat) -> ExtractionConfig {
+    ExtractionConfig { output_format: format, disable_ocr: true, ..Default::default() }
+}
+
+/// OCR forcé de toutes les pages avec PaddleOCR-VL, depuis les fichiers téléchargés dans `dossier_ocr`.
+fn config_ocr(dossier_ocr: &Path) -> ExtractionConfig {
+    ExtractionConfig {
+        output_format: OutputFormat::Markdown,
+        force_ocr: true,
+        ocr: Some(OcrConfig {
+            backend: "candle-paddleocr-vl".into(),
+            language: vec!["fra".into()],
+            backend_options: Some(serde_json::json!({
+                "task": "ocr",
+                "device": "cpu",
+                "model_path": dossier_ocr,
+            })),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+async fn tenter(octets: Vec<u8>, mime: &'static str, nom: Option<String>, config: ExtractionConfig) -> Result<Tentative, String> {
     // Lecture depuis les octets (et non depuis une URI) : xberg ne va jamais chercher de ressource externe.
     let resultat = xberg::extract(ExtractInput::from_bytes(octets, mime, nom), &config)
         .await
         .map_err(|e| format!("Extraction impossible : {e}"))?;
     let erreurs = resultat.errors.into_iter().map(|e| e.message).collect();
     let pages = resultat.results.iter().map(|d| d.counts.pages).sum();
-    let images = resultat.results.iter().map(|d| d.counts.images).sum();
     let texte = resultat.results.into_iter().map(|d| d.content).collect::<Vec<_>>().join("\n\n");
-    Ok(Tentative { texte, erreurs, pages, images })
+    Ok(Tentative { texte, erreurs, pages })
 }
 
-pub async fn extraire_texte(chemin: &Path) -> Result<String, String> {
+/// Texte du document ; `dossier_ocr` est le dossier du modèle d'OCR s'il est installé.
+pub async fn extraire_texte(chemin: &Path, dossier_ocr: Option<&Path>) -> Result<String, String> {
     let mime = type_mime(chemin).ok_or("Format non pris en charge (PDF, XLSX, XLS ou ODS attendu).")?;
     let taille = tokio::fs::metadata(chemin)
         .await
@@ -56,31 +82,40 @@ pub async fn extraire_texte(chemin: &Path) -> Result<String, String> {
 
     // Markdown d'abord (tableaux lisibles par le modèle) ; selon la mise en page, ce rendu peut
     // perdre le texte : second essai en texte brut avant de conclure à un document sans texte.
-    let markdown = tenter(octets.clone(), mime, nom.clone(), OutputFormat::Markdown).await?;
+    let markdown = tenter(octets.clone(), mime, nom.clone(), config_texte(OutputFormat::Markdown)).await?;
     if !markdown.texte.trim().is_empty() {
         return Ok(markdown.texte);
     }
-    let brut = tenter(octets, mime, nom, OutputFormat::Plain).await?;
+    let brut = tenter(octets.clone(), mime, nom.clone(), config_texte(OutputFormat::Plain)).await?;
     if !brut.texte.trim().is_empty() {
         return Ok(brut.texte);
     }
 
     let mut erreurs = markdown.erreurs;
     erreurs.extend(brut.erreurs);
+
+    // Aucun texte natif : OCR si le modèle est installé (seulement pour les PDF).
+    let ocr_possible = mime == "application/pdf";
+    if let (true, Some(dossier)) = (ocr_possible, dossier_ocr) {
+        let ocr = tenter(octets, mime, nom, config_ocr(dossier)).await?;
+        if !ocr.texte.trim().is_empty() {
+            return Ok(ocr.texte);
+        }
+        erreurs.extend(ocr.erreurs);
+    }
+
     erreurs.dedup();
     Err(if !erreurs.is_empty() {
         format!("Extraction impossible : {}", erreurs.join(" ; "))
-    } else if brut.images > 0 {
+    } else if ocr_possible && dossier_ocr.is_none() {
         format!(
-            "Aucun texte trouvé dans ce document ({} page(s), {} image(s)) : c'est probablement un PDF scanné. \
-             Seuls les documents contenant du texte sont pris en charge.",
-            brut.pages, brut.images
-        )
-    } else {
-        format!(
-            "Aucun texte n'a pu être lu dans ce document ({} page(s)). Son texte est peut-être encodé d'une façon \
-             non prise en charge : essayez de le réenregistrer en PDF (« Imprimer » → « Enregistrer en PDF »).",
+            "Ce document ne contient pas de texte lisible ({} page(s)) : c'est un PDF scanné ou dont le texte est \
+             dessiné. Téléchargez la lecture des PDF scannés (OCR) dans les paramètres, puis réessayez.",
             brut.pages
         )
+    } else if ocr_possible {
+        format!("Aucun texte n'a pu être reconnu dans ce document ({} page(s)), même par l'OCR.", brut.pages)
+    } else {
+        "Aucun texte trouvé dans ce document.".into()
     })
 }

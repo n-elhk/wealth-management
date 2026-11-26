@@ -10,12 +10,23 @@ export interface EtatIa {
   tailleTotale: number;
   /** Fenêtre de contexte du modèle, en tokens. */
   contexte: number;
+  /** Modèle d'OCR (facultatif) : lecture des PDF scannés ou dont le texte est dessiné. */
+  ocrInstalle: boolean;
+  /** Taille estimée du modèle d'OCR, en octets. */
+  tailleOcr: number;
 }
+
+/** Modèles téléchargeables : langage (Mistral, indispensable) et OCR (PaddleOCR-VL, facultatif). */
+export type ModeleIaLocale = 'langage' | 'ocr';
 
 export interface ProgressionTelechargement {
   fichier: string;
   recu: number;
   total: number;
+}
+
+export interface TelechargementEnCours extends ProgressionTelechargement {
+  modele: ModeleIaLocale;
 }
 
 export type ProgressionGeneration =
@@ -52,7 +63,7 @@ export class IaLocale {
   /** `null` si l'IA locale n'est pas disponible sur cette plateforme. Rechargé après chaque opération. */
   readonly etat = resource({ loader: () => this.lireEtat() });
 
-  private readonly _telechargement = signal<ProgressionTelechargement | null>(null);
+  private readonly _telechargement = signal<TelechargementEnCours | null>(null);
   /** Progression du téléchargement en cours, `null` s'il n'y en a pas. */
   readonly telechargement = this._telechargement.asReadonly();
 
@@ -64,14 +75,14 @@ export class IaLocale {
     }
   }
 
-  /** Télécharge (ou reprend) le modèle ; les fichiers sont vérifiés par SHA-256. */
-  async telecharger(): Promise<void> {
+  /** Télécharge (ou reprend) un modèle ; les fichiers sont vérifiés par SHA-256. Un seul à la fois. */
+  async telecharger(modele: ModeleIaLocale): Promise<void> {
     if (this._telechargement()) return;
-    this._telechargement.set({ fichier: '', recu: 0, total: 0 });
+    this._telechargement.set({ modele, fichier: '', recu: 0, total: 0 });
     const canal = new Channel<ProgressionTelechargement>();
-    canal.onmessage = (p) => this._telechargement.set(p);
+    canal.onmessage = (p) => this._telechargement.set({ ...p, modele });
     try {
-      await invoke('ia_telecharger', { canal });
+      await invoke('ia_telecharger', { modele, canal });
     } finally {
       this._telechargement.set(null);
       this.etat.reload();
@@ -122,7 +133,11 @@ export class IaLocale {
     const interrompre = () => void this.annuler();
     signal.addEventListener('abort', interrompre, { once: true });
     try {
-      progression({ etape: 'Lecture du document…' });
+      // Sans texte natif, l'extraction passe par l'OCR (si installé), nettement plus long et non interruptible.
+      progression({
+        etape: 'Lecture du document…',
+        detail: this.etat.value()?.ocrInstalle ? 'Un PDF scanné est lu par OCR : comptez plusieurs minutes.' : undefined,
+      });
       const texte = await this.extraireTexte(chemin);
       signal.throwIfAborted();
       progression({ etape: 'Préparation de l’analyse…' });
